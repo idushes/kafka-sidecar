@@ -7,7 +7,7 @@ RUN go mod download
 
 COPY . .
 
-RUN go build -o main
+RUN GOARCH=amd64 GOOS=linux go build -o main
 
 EXPOSE 8000
 
