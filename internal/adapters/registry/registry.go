@@ -17,7 +17,7 @@ func New(url string) *Registry {
 }
 
 func (r *Registry) Encode(topic string, value []byte) ([]byte, error) {
-	schema, err := r.client.GetLatestSchema(topic)
+	schema, err := r.client.GetLatestSchema(topic + "-value")
 	if err != nil {
 		return nil, fmt.Errorf("get schema error: %w", err)
 	}
@@ -35,7 +35,7 @@ func (r *Registry) Encode(topic string, value []byte) ([]byte, error) {
 }
 
 func (r *Registry) Decode(topic string, value []byte) ([]byte, error) {
-	schema, err := r.client.GetLatestSchema(topic)
+	schema, err := r.client.GetLatestSchema(topic + "-value")
 	if err != nil {
 		return nil, fmt.Errorf("get schema error: %w", err)
 	}
