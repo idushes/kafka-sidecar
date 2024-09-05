@@ -10,17 +10,19 @@ import (
 )
 
 type Kafka struct {
-	brokers   []string
-	topics    []string
-	consumers map[string]*kafka.Reader
-	producer  *kafka.Writer
+	brokers         []string
+	topics          []string
+	consumerGroupId string
+	consumers       map[string]*kafka.Reader
+	producer        *kafka.Writer
 }
 
-func New(brokers, topics []string) *Kafka {
+func New(brokers, topics []string, consumerGroupId string) *Kafka {
 	k := &Kafka{
-		brokers:   brokers,
-		topics:    topics,
-		consumers: make(map[string]*kafka.Reader, len(topics)),
+		brokers:         brokers,
+		topics:          topics,
+		consumerGroupId: consumerGroupId,
+		consumers:       make(map[string]*kafka.Reader, len(topics)),
 		producer: kafka.NewWriter(kafka.WriterConfig{
 			Brokers: brokers,
 		}),
@@ -29,7 +31,7 @@ func New(brokers, topics []string) *Kafka {
 		k.consumers[topic] = kafka.NewReader(kafka.ReaderConfig{
 			Brokers: brokers,
 			Topic:   topic,
-			GroupID: "1",
+			GroupID: consumerGroupId,
 		})
 	}
 

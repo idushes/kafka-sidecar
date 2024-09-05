@@ -25,7 +25,7 @@ func main() {
 		zerolog.SetGlobalLevel(zerolog.DebugLevel)
 	}
 
-	kafkaInst := kafka.New(config.Config.KafkaBrokers, config.Config.KafkaTopics)
+	kafkaInst := kafka.New(config.Config.KafkaBrokers, config.Config.KafkaTopics, config.Config.KafkaConsumerGroupId)
 	defer func() {
 		if err := kafkaInst.Close(); err != nil {
 			log.Error().Err(err).Msg("close kafka error")
