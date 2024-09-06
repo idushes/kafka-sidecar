@@ -24,14 +24,14 @@ func (rs *RemoteServer) Send(ctx context.Context, topic string, headers map[stri
 		Headers   map[string]string `json:"headers"`
 		Key       string            `json:"key"`
 		Value     json.RawMessage   `json:"value"`
-		Timestamp time.Time         `json:"timestamp"`
+		Timestamp int64             `json:"timestamp"`
 		Offset    int64             `json:"offset"`
 	}{
 		Topic:     topic,
 		Headers:   headers,
 		Key:       string(key),
 		Value:     value,
-		Timestamp: timestamp,
+		Timestamp: timestamp.UnixMilli(),
 		Offset:    offset,
 	}
 
