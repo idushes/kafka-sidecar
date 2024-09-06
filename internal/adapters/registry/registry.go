@@ -22,6 +22,9 @@ func New(url string) *Registry {
 		schemas: map[string]map[uint32]*srclient.Schema{},
 	}
 
+	r.client.CodecJsonEnabled(true)
+	r.client.CodecCreationEnabled(true)
+
 	return r
 }
 
@@ -43,7 +46,7 @@ func (r *Registry) Encode(topic string, value []byte) ([]byte, error) {
 	schemaIDBytes := make([]byte, 4)
 	binary.BigEndian.PutUint32(schemaIDBytes, uint32(schema.ID()))
 
-	var recordValue []byte
+	recordValue := make([]byte, 0, 1+len(schemaIDBytes)+len(valueBytes))
 	recordValue = append(recordValue, byte(0))
 	recordValue = append(recordValue, schemaIDBytes...)
 	recordValue = append(recordValue, valueBytes...)
