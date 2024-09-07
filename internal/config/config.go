@@ -29,6 +29,12 @@ func init() {
 	Config.HttpRoute = getRequiredEnv("HTTP_ROUTE")
 	Config.TerminateOnError, _ = strconv.ParseBool(getEnv("TERMINATE_ON_ERROR", "true"))
 	Config.CommitOnSuccess, _ = strconv.ParseBool(getEnv("COMMIT_ON_SUCCESS", "true"))
+
+	log.Info().Strs("Brokers", Config.KafkaBrokers).
+		Strs("Topics", Config.KafkaTopics).
+		Str("GroupID", Config.KafkaConsumerGroupId).
+		Str("HttpRoute", Config.HttpRoute).
+		Msg("Consumer configuration")
 }
 
 func getEnv(key, defaultValue string) string {
