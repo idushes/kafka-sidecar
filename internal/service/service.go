@@ -57,7 +57,8 @@ func (s *Service) Run(ctx context.Context) <-chan error {
 			if err != nil {
 				errCh <- fmt.Errorf("processing error: %w", err)
 			}
-			if err == nil || !s.CommitOnSuccess {
+			if err == nil && s.CommitOnSuccess {
+				log.Debug().Msgf("Committing message with offset: %d", m.Offset)
 				err = s.Kafka.CommitMessage(ctx, m)
 				if err != nil {
 					errCh <- fmt.Errorf("commit error: %w", err)
