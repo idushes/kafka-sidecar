@@ -22,16 +22,20 @@ This project provides a sidecar microservice that attaches to applications, hand
 
 The service can be configured via environment variables:
 
-- `KAFKA_BROKERS`: Comma-separated list of Kafka broker addresses.
-- `KAFKA_TOPICS`: Comma-separated list of Kafka topics to listen to.
-- `SCHEMA_REGISTRY_URL`: URL of the Avro schema registry.
-- `HTTP_ROUTE`: The HTTP route that will handle the POST request.
-- `TERMINATE_ON_ERROR`:  Set to `true` to stop the service on errors, or `false` to log errors and continue.
-- `COMMIT_ON_SUCCESS`: Set to `true` to commit Kafka offsets only on successful processing.
+- `KAFKA_BROKERS`: Comma-separated list of Kafka broker addresses. (default: `localhost:9092`) 
+- `DEBUG`: Set to `true` to enable debug logging, or `false` to show only errors.(default: `false`) 
+- `KAFKA_CONSUMER_GROUP_ID`: Kafka consumer group ID. (required)
+- `KAFKA_TOPICS`: Comma-separated list of Kafka topics to listen to. (required)
+- `SCHEMA_REGISTRY_URL`: URL of the Avro schema registry. (default: `http://localhost:8081`) 
+- `HTTP_ROUTE`: The HTTP route that will handle the POST request. (required)
+- `TERMINATE_ON_ERROR`:  Set to `true` to stop the service on errors, or `false` to log errors and continue. (default: `true`)
+- `COMMIT_ON_SUCCESS`: Set to `true` to commit Kafka offsets only on successful processing. (default: `true`)
 
 Example:
 
 ```bash
+export DEBUG=true
+export KAFKA_CONSUMER_GROUP_ID="my-consumer-group"
 export KAFKA_BROKERS="broker1:9092,broker2:9092"
 export KAFKA_TOPICS="topic1,topic2"
 export SCHEMA_REGISTRY_URL="http://schema-registry:8081"
