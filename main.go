@@ -2,16 +2,12 @@ package main
 
 import (
 	"context"
-	"net/http"
-	"os"
-
 	"kafka-sidecar/internal/adapters/kafka"
 	"kafka-sidecar/internal/adapters/registry"
 	"kafka-sidecar/internal/adapters/remoteServer"
 	"kafka-sidecar/internal/config"
 	"kafka-sidecar/internal/service"
 
-	"github.com/labstack/echo/v4"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
@@ -33,26 +29,12 @@ func main() {
 	}()
 
 	srv := &service.Service{
-		Kafka:           kafkaInst,
-		SchemaRegistry:  registry.New(config.Config.SchemaRegistryUrl),
-		RemoteServer:    remoteServer.New(config.Config.HttpRoute),
-		CommitOnSuccess: config.Config.CommitOnSuccess,
+		Kafka:            kafkaInst,
+		SchemaRegistry:   registry.New(config.Config.SchemaRegistryUrl),
+		RemoteServer:     remoteServer.New(config.Config.HttpRoute),
+		CommitOnSuccess:  config.Config.CommitOnSuccess,
+		TerminateOnError: config.Config.TerminateOnError,
 	}
 
-	for err := range srv.Run(ctx) {
-		log.Error().Err(err).Msg("service error")
-		if config.Config.TerminateOnError {
-			os.Exit(1)
-		}
-	}
-
-	e := echo.New()
-	e.Debug = config.Config.Debug
-	e.GET("/health/check", func(c echo.Context) error {
-		return c.HTML(http.StatusOK, "ok")
-	})
-	if err := e.Start("localhost:8080"); err != nil {
-		log.Fatal().Err(err).Msg("start router error")
-		os.Exit(1)
-	}
+	srv.Run(ctx)
 }

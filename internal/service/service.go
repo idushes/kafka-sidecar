@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/rs/zerolog/log"
@@ -27,47 +28,51 @@ type Kafka interface {
 }
 
 type Service struct {
-	Kafka           Kafka
-	SchemaRegistry  SchemaRegistry
-	RemoteServer    RemoteServer
-	CommitOnSuccess bool
+	Kafka            Kafka
+	SchemaRegistry   SchemaRegistry
+	RemoteServer     RemoteServer
+	CommitOnSuccess  bool
+	TerminateOnError bool
 }
 
-func (s *Service) Run(ctx context.Context) <-chan error {
+func (s *Service) Run(ctx context.Context) {
 	messageCh, errorCh := s.Kafka.Listen(ctx)
-
-	errCh := make(chan error)
 
 	go func() {
 		for err := range errorCh {
-			errCh <- fmt.Errorf("listen error: %w", err)
-		}
-	}()
-
-	go func() {
-		for m := range messageCh {
-			log.Debug().
-				Str("topic", m.Topic).
-				Str("key", string(m.Key)).
-				Time("timestamp", m.Time).
-				Int64("offset", m.Offset).
-				Msg("new message")
-
-			err := s.processing(ctx, m)
-			if err != nil {
-				errCh <- fmt.Errorf("processing error: %w", err)
-			}
-			if err == nil && s.CommitOnSuccess {
-				log.Debug().Msgf("Committing message with offset: %d", m.Offset)
-				err = s.Kafka.CommitMessage(ctx, m)
-				if err != nil {
-					errCh <- fmt.Errorf("commit error: %w", err)
-				}
+			log.Error().Err(err).Msg("listen error")
+			if s.TerminateOnError {
+				os.Exit(1)
 			}
 		}
 	}()
 
-	return errCh
+	for m := range messageCh {
+		log.Debug().
+			Str("topic", m.Topic).
+			Str("key", string(m.Key)).
+			Time("timestamp", m.Time).
+			Int64("offset", m.Offset).
+			Msg("new message")
+
+		needExit := false
+		err := s.processing(ctx, m)
+		if err != nil {
+			log.Error().Err(err).Msg("processing error")
+			needExit = s.TerminateOnError
+		}
+		if err == nil && s.CommitOnSuccess {
+			log.Debug().Msgf("Committing message with offset: %d", m.Offset)
+			if err = s.Kafka.CommitMessage(ctx, m); err != nil {
+				log.Error().Err(err).Msg("commit error")
+				needExit = needExit || s.TerminateOnError
+			}
+		}
+
+		if needExit {
+			os.Exit(1)
+		}
+	}
 }
 
 func (s *Service) processing(ctx context.Context, msg kafka.Message) error {
