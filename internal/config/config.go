@@ -16,6 +16,7 @@ type conf struct {
 	HttpRoute            string
 	TerminateOnError     bool
 	CommitOnSuccess      bool
+	StartupDelay         int
 }
 
 var Config conf
@@ -29,6 +30,7 @@ func init() {
 	Config.HttpRoute = getRequiredEnv("HTTP_ROUTE")
 	Config.TerminateOnError, _ = strconv.ParseBool(getEnv("TERMINATE_ON_ERROR", "true"))
 	Config.CommitOnSuccess, _ = strconv.ParseBool(getEnv("COMMIT_ON_SUCCESS", "true"))
+	Config.StartupDelay, _ = strconv.Atoi(getEnv("STARTUP_DELAY", "0"))
 
 	log.Info().Strs("Brokers", Config.KafkaBrokers).
 		Strs("Topics", Config.KafkaTopics).

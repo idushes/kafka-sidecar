@@ -30,6 +30,7 @@ The service can be configured via environment variables:
 - `HTTP_ROUTE`: The HTTP route that will handle the POST request. (required)
 - `TERMINATE_ON_ERROR`:  Set to `true` to stop the service on errors, or `false` to log errors and continue. (default: `true`)
 - `COMMIT_ON_SUCCESS`: Set to `true` to commit Kafka offsets only on successful processing. (default: `true`)
+- `STARTUP_DELAY`: Delay in seconds before starting the service. (default: `0`)
 
 Example:
 
@@ -41,4 +42,5 @@ export KAFKA_TOPICS="topic1,topic2"
 export SCHEMA_REGISTRY_URL="http://schema-registry:8081"
 export HTTP_ROUTE="http://localhost:8080/process"
 export TERMINATE_ON_ERROR="true"
+export STARTUP_DELAY="2"
 export COMMIT_ON_SUCCESS="true"
