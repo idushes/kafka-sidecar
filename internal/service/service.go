@@ -78,7 +78,12 @@ func (s *Service) Run(ctx context.Context) {
 func (s *Service) processing(ctx context.Context, msg kafka.Message) error {
 	value, err := s.SchemaRegistry.Decode(msg.Topic, msg.Value)
 	if err != nil {
-		return fmt.Errorf("decode message error: %w", err)
+		return fmt.Errorf(
+			"failed to decode message from topic %s: raw_value: %v, error: %w",
+			msg.Topic,
+			msg.Value,
+			err,
+		)
 	}
 
 	headers := make(map[string]string, len(msg.Headers))
@@ -96,7 +101,13 @@ func (s *Service) processing(ctx context.Context, msg kafka.Message) error {
 		msg.Offset,
 	)
 	if err != nil {
-		return fmt.Errorf("request to remote server error: %w", err)
+		return fmt.Errorf(
+			"request to remote server error for topic %s: key: %v, value: %v, error: %w",
+			msg.Topic,
+			msg.Key,
+			value,
+			err,
+		)
 	}
 
 	var res []struct {
@@ -107,7 +118,12 @@ func (s *Service) processing(ctx context.Context, msg kafka.Message) error {
 	}
 
 	if err := json.Unmarshal(data, &res); err != nil {
-		return fmt.Errorf("unmarshal response error: %w", err)
+		return fmt.Errorf(
+			"unmarshal response error for topic %s: data: %v, error: %w",
+			msg.Topic,
+			data,
+			err,
+		)
 	}
 
 	for _, re := range res {
@@ -119,7 +135,12 @@ func (s *Service) processing(ctx context.Context, msg kafka.Message) error {
 		}
 		m.Value, err = s.SchemaRegistry.Encode(re.Topic, re.Value)
 		if err != nil {
-			return fmt.Errorf("pack message error: %w", err)
+			return fmt.Errorf(
+				"pack message error for topic %s: value: %v, error: %w",
+				msg.Topic,
+				value,
+				err,
+			)
 		}
 
 		log.Debug().
