@@ -81,7 +81,7 @@ func (s *Service) processing(ctx context.Context, msg kafka.Message) error {
 		return fmt.Errorf(
 			"failed to decode message from topic %s: raw_value: %v, error: %w",
 			msg.Topic,
-			msg.Value,
+			string(msg.Value),
 			err,
 		)
 	}
@@ -119,8 +119,7 @@ func (s *Service) processing(ctx context.Context, msg kafka.Message) error {
 
 	if err := json.Unmarshal(data, &res); err != nil {
 		return fmt.Errorf(
-			"unmarshal response error for topic %s: data: %v, error: %w",
-			msg.Topic,
+			"unmarshal response error for data: %v, error: %w",
 			data,
 			err,
 		)
@@ -137,8 +136,8 @@ func (s *Service) processing(ctx context.Context, msg kafka.Message) error {
 		if err != nil {
 			return fmt.Errorf(
 				"pack message error for topic %s: value: %v, error: %w",
-				msg.Topic,
-				value,
+				re.Topic,
+				string(re.Value),
 				err,
 			)
 		}
