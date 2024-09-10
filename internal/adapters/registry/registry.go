@@ -126,14 +126,8 @@ func (r *Registry) getSchema(topic string, id *uint32) (*srclient.Schema, error)
 }
 
 type schemaStruct struct {
-	Type      string `json:"type"`
-	Name      string `json:"name"`
-	Namespace string `json:"namespace"`
-	Doc       string `json:"doc"`
-	Fields    []struct {
-		Name    string      `json:"name"`
-		Type    interface{} `json:"type"`
-		Default bool        `json:"default,omitempty"`
+	Fields []struct {
+		Name string `json:"name"`
 	} `json:"fields"`
 }
 
@@ -144,7 +138,7 @@ func (r *Registry) deleteUnnecessaryFields(schema *srclient.Schema, b []byte) ([
 	}
 	var s schemaStruct
 	if err := json.Unmarshal([]byte(schema.Codec().Schema()), &s); err != nil {
-		return nil, fmt.Errorf("unmarshal message error: %w", err)
+		return nil, fmt.Errorf("unmarshal schema error: %w", err)
 	}
 
 	needDelete := make([]string, 0, len(m))
