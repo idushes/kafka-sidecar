@@ -2,6 +2,7 @@ package registry
 
 import (
 	"encoding/binary"
+	"encoding/json"
 	"fmt"
 	"sort"
 	"sync"
@@ -32,6 +33,11 @@ func (r *Registry) Encode(topic string, value []byte) ([]byte, error) {
 	schema, err := r.getSchema(topic+"-value", nil)
 	if err != nil {
 		return nil, fmt.Errorf("get schema error: %w", err)
+	}
+
+	value, err = r.deleteUnnecessaryFields(schema, value)
+	if err != nil {
+		return nil, fmt.Errorf("delete unnecessary fields error: %w", err)
 	}
 
 	native, _, err := schema.Codec().NativeFromTextual(value)
@@ -117,4 +123,54 @@ func (r *Registry) getSchema(topic string, id *uint32) (*srclient.Schema, error)
 	r.schemas[topic][*id] = schema
 
 	return schema, nil
+}
+
+type schemaStruct struct {
+	Type      string `json:"type"`
+	Name      string `json:"name"`
+	Namespace string `json:"namespace"`
+	Doc       string `json:"doc"`
+	Fields    []struct {
+		Name    string      `json:"name"`
+		Type    interface{} `json:"type"`
+		Default bool        `json:"default,omitempty"`
+	} `json:"fields"`
+}
+
+func (r *Registry) deleteUnnecessaryFields(schema *srclient.Schema, b []byte) ([]byte, error) {
+	var m map[string]json.RawMessage
+	if err := json.Unmarshal(b, &m); err != nil {
+		return nil, fmt.Errorf("unmarshal message error: %w", err)
+	}
+	var s schemaStruct
+	if err := json.Unmarshal([]byte(schema.Codec().Schema()), &s); err != nil {
+		return nil, fmt.Errorf("unmarshal message error: %w", err)
+	}
+
+	needDelete := make([]string, 0, len(m))
+	for fieldName := range m {
+		ok := false
+		for i := 0; i < len(s.Fields); i++ {
+			if s.Fields[i].Name == fieldName {
+				ok = true
+				break
+			}
+		}
+		if !ok {
+			needDelete = append(needDelete, fieldName)
+		}
+	}
+
+	if len(needDelete) > 0 {
+		for _, fieldName := range needDelete {
+			delete(m, fieldName)
+		}
+		var err error
+		b, err = json.Marshal(m)
+		if err != nil {
+			return nil, fmt.Errorf("marshal message error: %w", err)
+		}
+	}
+
+	return b, nil
 }
