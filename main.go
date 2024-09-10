@@ -7,12 +7,17 @@ import (
 	"kafka-sidecar/internal/adapters/remoteServer"
 	"kafka-sidecar/internal/config"
 	"kafka-sidecar/internal/service"
+	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
 
 func main() {
+	if config.Config.StartupDelay > 0 {
+		log.Info().Msgf("Startup delay %d seconds", config.Config.StartupDelay)
+		time.Sleep(time.Duration(config.Config.StartupDelay) * time.Second)
+	}
 	ctx, doneFunc := context.WithCancel(context.Background())
 	defer doneFunc()
 

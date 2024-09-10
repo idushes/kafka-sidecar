@@ -16,6 +16,7 @@ type conf struct {
 	HttpRoute            string
 	TerminateOnError     bool
 	CommitOnSuccess      bool
+	StartupDelay         int
 }
 
 var Config conf
@@ -23,12 +24,13 @@ var Config conf
 func init() {
 	Config.Debug, _ = strconv.ParseBool(getEnv("DEBUG", "false"))
 	Config.KafkaBrokers = strings.Split(getEnv("KAFKA_BROKERS", "localhost:9092"), ",")
-	Config.KafkaTopics = strings.Split(getRequiredEnv("KAFKA_TOPICS"), ",")
+	Config.KafkaTopics = removeWhitespace(strings.Split(getRequiredEnv("KAFKA_TOPICS"), ","))
 	Config.KafkaConsumerGroupId = getRequiredEnv("KAFKA_CONSUMER_GROUP_ID")
 	Config.SchemaRegistryUrl = getEnv("SCHEMA_REGISTRY_URL", "http://localhost:8081")
 	Config.HttpRoute = getRequiredEnv("HTTP_ROUTE")
 	Config.TerminateOnError, _ = strconv.ParseBool(getEnv("TERMINATE_ON_ERROR", "true"))
 	Config.CommitOnSuccess, _ = strconv.ParseBool(getEnv("COMMIT_ON_SUCCESS", "true"))
+	Config.StartupDelay, _ = strconv.Atoi(getEnv("STARTUP_DELAY", "0"))
 
 	log.Info().Strs("Brokers", Config.KafkaBrokers).
 		Strs("Topics", Config.KafkaTopics).
@@ -51,4 +53,12 @@ func getRequiredEnv(key string) string {
 	log.Error().Msgf("Required environment variable %s is not set", key)
 	os.Exit(1)
 	return ""
+}
+
+func removeWhitespace(topics []string) []string {
+	cleanedTopics := make([]string, len(topics))
+	for i, topic := range topics {
+		cleanedTopics[i] = strings.TrimSpace(topic)
+	}
+	return cleanedTopics
 }
