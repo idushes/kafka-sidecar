@@ -168,6 +168,13 @@ func (s *Service) kafkaProcessing(ctx context.Context, msg kafka.Message) error 
 		)
 	}
 
+	for i := range res {
+		if res[i].Headers == nil {
+			res[i].Headers = map[string]string{}
+		}
+		res[i].Headers["processed_topic"] = msg.Topic
+	}
+
 	return s.send(ctx, res)
 }
 

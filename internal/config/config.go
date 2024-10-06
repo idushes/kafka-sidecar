@@ -1,10 +1,12 @@
 package config
 
 import (
-	"github.com/rs/zerolog/log"
+	"kafka-sidecar/internal/helpers"
 	"os"
 	"strconv"
 	"strings"
+
+	"github.com/rs/zerolog/log"
 )
 
 type conf struct {
@@ -26,10 +28,10 @@ var Config conf
 
 func init() {
 	Config.Debug, _ = strconv.ParseBool(getEnv("DEBUG", "false"))
-	Config.KafkaBrokers = strings.Split(getEnv("KAFKA_BROKERS", "localhost:9092"), ",")
-	Config.KafkaTopics = removeWhitespace(strings.Split(getEnv("KAFKA_TOPICS", ""), ","))
+	Config.KafkaBrokers = helpers.RemoveEmptyStrings(strings.Split(getEnv("KAFKA_BROKERS", "localhost:9092"), ","))
+	Config.KafkaTopics = helpers.RemoveEmptyStrings(strings.Split(getEnv("KAFKA_TOPICS", ""), ","))
 	Config.KafkaConsumerGroupId = getEnv("KAFKA_CONSUMER_GROUP_ID", "")
-	Config.AllowedTopics = strings.Split(getEnv("ALLOWED_TOPICS", ""), ",")
+	Config.AllowedTopics = helpers.RemoveEmptyStrings(strings.Split(getEnv("ALLOWED_TOPICS", ""), ","))
 	Config.SchemaRegistryUrl = getEnv("SCHEMA_REGISTRY_URL", "http://localhost:8081")
 	Config.HttpRoute = getEnv("HTTP_ROUTE", "")
 	Config.HttpPort, _ = strconv.Atoi(getEnv("HTTP_PORT", ""))
@@ -58,21 +60,4 @@ func getEnv(key, defaultValue string) string {
 		return value
 	}
 	return defaultValue
-}
-
-func getRequiredEnv(key string) string {
-	if value, exists := os.LookupEnv(key); exists {
-		return value
-	}
-	log.Error().Msgf("Required environment variable %s is not set", key)
-	os.Exit(1)
-	return ""
-}
-
-func removeWhitespace(topics []string) []string {
-	cleanedTopics := make([]string, len(topics))
-	for i, topic := range topics {
-		cleanedTopics[i] = strings.TrimSpace(topic)
-	}
-	return cleanedTopics
 }
