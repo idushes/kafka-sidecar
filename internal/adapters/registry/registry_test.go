@@ -16,19 +16,23 @@ var testTable = []struct {
 	MessageAfter  []byte
 }{
 	{
-		[]byte(`{"id": "test", "text": "test test test", "archived": false}`),
-		[]byte(`{"id": "test", "text": "test test test", "archived": false}`),
+		[]byte(`{"id": "test", "text": "test test test", "archived": false, "desire": {"id": "11111111"}}`),
+		[]byte(`{"id": "test", "text": "test test test", "archived": false, "desire": {"id": "11111111"}}`),
 	},
 	{
-		[]byte(`{"id": "test", "text": "test test test", "archived": false, "_updated_at": 1257894000000000000}`),
-		[]byte(`{"id": "test", "text": "test test test", "archived": false}`),
+		[]byte(`{"id": "test", "text": "test test test", "archived": false, "desire": {"id": "11111111"}, "_updated_at": 1257894000000000000}`),
+		[]byte(`{"id": "test", "text": "test test test", "archived": false, "desire": {"id": "11111111"}}`),
+	},
+	{
+		[]byte(`{"id": "test", "text": "test test test", "archived": false, "desire": {"id": "11111111", "category_name": "test"}}`),
+		[]byte(`{"id": "test", "text": "test test test", "archived": false, "desire": {"id": "11111111"}}`),
 	},
 }
 
 func TestRegistry(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		fmt.Println(r.URL)
-		fmt.Fprintln(w, `{"subject":"test-value","version":1,"id":1,"schema":"{\"type\":\"record\",\"name\":\"test\",\"namespace\":\"xr.test.kafka.avro\",\"doc\":\"\",\"fields\":[{\"name\":\"id\",\"type\":\"string\"},{\"name\":\"text\",\"type\":[\"null\",\"string\"]},{\"name\":\"archived\",\"type\":\"boolean\",\"default\":false}]}"}`)
+		//fmt.Println(r.URL)
+		fmt.Fprintln(w, `{"subject":"test-value","version":1,"id":1,"schema":"{\"type\":\"record\",\"name\":\"test\",\"namespace\":\"xr.test.kafka.avro\",\"doc\":\"\",\"fields\":[{\"name\":\"id\",\"type\":\"string\"},{\"name\":\"text\",\"type\":[\"null\",\"string\"]},{\"name\":\"archived\",\"type\":\"boolean\",\"default\":false},{\"name\": \"desire\",\"type\": {\"type\": \"record\",\"name\": \"DesireViewDesire\",\"doc\": \"Desire\",\"fields\": [{\"name\": \"id\",\"type\": \"string\"}]}}]}"}`)
 	}))
 	defer ts.Close()
 

@@ -43,7 +43,12 @@ func (r *Registry) Encode(topic string, value []byte) ([]byte, error) {
 		return nil, fmt.Errorf("get schema error: %w", err)
 	}
 
-	value, err = r.deleteUnnecessaryFields(schema, value)
+	var s schemaStruct
+	if err := json.Unmarshal([]byte(schema.Codec().Schema()), &s); err != nil {
+		return nil, fmt.Errorf("unmarshal schema error: %w", err)
+	}
+
+	value, err = r.deleteUnnecessaryFields(s, value)
 	if err != nil {
 		return nil, fmt.Errorf("delete unnecessary fields error: %w", err)
 	}
@@ -143,18 +148,15 @@ func (r *Registry) getSchema(topic string, id *uint32) (*srclient.Schema, error)
 
 type schemaStruct struct {
 	Fields []struct {
-		Name string `json:"name"`
+		Name string          `json:"name"`
+		Type json.RawMessage `json:"type"`
 	} `json:"fields"`
 }
 
-func (r *Registry) deleteUnnecessaryFields(schema *srclient.Schema, b []byte) ([]byte, error) {
+func (r *Registry) deleteUnnecessaryFields(s schemaStruct, b []byte) ([]byte, error) {
 	var m map[string]json.RawMessage
 	if err := json.Unmarshal(b, &m); err != nil {
 		return nil, fmt.Errorf("unmarshal message error: %w", err)
-	}
-	var s schemaStruct
-	if err := json.Unmarshal([]byte(schema.Codec().Schema()), &s); err != nil {
-		return nil, fmt.Errorf("unmarshal schema error: %w", err)
 	}
 
 	needDelete := make([]string, 0, len(m))
@@ -162,6 +164,13 @@ func (r *Registry) deleteUnnecessaryFields(schema *srclient.Schema, b []byte) ([
 		ok := false
 		for i := 0; i < len(s.Fields); i++ {
 			if s.Fields[i].Name == fieldName {
+				var fs schemaStruct
+				if err := json.Unmarshal(s.Fields[i].Type, &fs); err == nil {
+					m[fieldName], err = r.deleteUnnecessaryFields(fs, m[fieldName])
+					if err != nil {
+						return nil, fmt.Errorf("delete from subschema %q error: %w", fieldName, err)
+					}
+				}
 				ok = true
 				break
 			}
@@ -171,15 +180,13 @@ func (r *Registry) deleteUnnecessaryFields(schema *srclient.Schema, b []byte) ([
 		}
 	}
 
-	if len(needDelete) > 0 {
-		for _, fieldName := range needDelete {
-			delete(m, fieldName)
-		}
-		var err error
-		b, err = json.Marshal(m)
-		if err != nil {
-			return nil, fmt.Errorf("marshal message error: %w", err)
-		}
+	for _, fieldName := range needDelete {
+		delete(m, fieldName)
+	}
+	var err error
+	b, err = json.Marshal(m)
+	if err != nil {
+		return nil, fmt.Errorf("marshal message error: %w", err)
 	}
 
 	return b, nil

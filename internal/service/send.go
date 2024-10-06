@@ -36,6 +36,11 @@ func (s *Service) send(ctx context.Context, msg []sendMessage) error {
 		}
 		kafkaMessages[i].Value, err = s.SchemaRegistry.Encode(re.Topic, re.Value)
 		if err != nil {
+			log.Debug().
+				Str("topic", kafkaMessages[i].Topic).
+				Any("headers", kafkaMessages[i].Headers).
+				Bytes("value", kafkaMessages[i].Value).
+				Msg("send message error")
 			return fmt.Errorf(
 				"pack message error for topic %s: value: %v, error: %w",
 				re.Topic,
