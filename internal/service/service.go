@@ -72,7 +72,7 @@ func (s *Service) Run(ctx context.Context) {
 				Str("key", string(m.Key)).
 				Time("timestamp", m.Time).
 				Int64("offset", m.Offset).
-				Msg("new message")
+				Msg("new message from kafka")
 
 			needExit := false
 			err := s.kafkaProcessing(ctx, m)
@@ -112,6 +112,10 @@ func (s *Service) Run(ctx context.Context) {
 		}()
 
 		for m := range messageCh {
+			log.Debug().
+				Bytes("message", m).
+				Msg("new message from http")
+
 			err := s.httpServerProcessing(ctx, m)
 			if err != nil {
 				log.Error().Err(err).Msg("http server processing error")
