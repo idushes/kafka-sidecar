@@ -166,9 +166,8 @@ func (r *Registry) deleteUnnecessaryFields(s schemaStruct, b []byte) ([]byte, er
 			if s.Fields[i].Name == fieldName {
 				var fs schemaStruct
 				if err := json.Unmarshal(s.Fields[i].Type, &fs); err == nil {
-					m[fieldName], err = r.deleteUnnecessaryFields(fs, m[fieldName])
-					if err != nil {
-						return nil, fmt.Errorf("delete from subschema %q error: %w", fieldName, err)
+					if b, err = r.deleteUnnecessaryFields(fs, m[fieldName]); err == nil {
+						m[fieldName] = b
 					}
 				}
 				ok = true
