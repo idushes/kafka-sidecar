@@ -6,21 +6,29 @@ import (
 	"fmt"
 	"sort"
 	"sync"
+	"time"
 
 	"github.com/riferrei/srclient"
 )
 
-type Registry struct {
-	client *srclient.SchemaRegistryClient
-
-	mu      sync.Mutex
-	schemas map[string]map[uint32]*srclient.Schema
+type schemaBuf struct {
+	Schema   *srclient.Schema
+	Deadline time.Time
 }
 
-func New(url string) *Registry {
+type Registry struct {
+	client                    *srclient.SchemaRegistryClient
+	avroSchemaRefreshInterval int
+
+	mu      sync.Mutex
+	schemas map[string]map[uint32]*schemaBuf
+}
+
+func New(url string, avroSchemaRefreshInterval int) *Registry {
 	r := &Registry{
-		client:  srclient.NewSchemaRegistryClient(url),
-		schemas: map[string]map[uint32]*srclient.Schema{},
+		client:                    srclient.NewSchemaRegistryClient(url),
+		avroSchemaRefreshInterval: avroSchemaRefreshInterval,
+		schemas:                   map[string]map[uint32]*schemaBuf{},
 	}
 
 	r.client.CodecJsonEnabled(true)
@@ -87,15 +95,20 @@ func (r *Registry) getSchema(topic string, id *uint32) (*srclient.Schema, error)
 	var schema *srclient.Schema
 
 	if m := r.schemas[topic]; m != nil {
+		buf := &schemaBuf{}
 		if id != nil {
-			schema = m[*id]
+			buf = m[*id]
 		} else if len(m) > 0 {
 			ids := make([]int, 0, len(m))
 			for u := range m {
 				ids = append(ids, int(u))
 			}
 			sort.Ints(ids)
-			schema = m[uint32(ids[len(ids)-1])]
+			buf = m[uint32(ids[len(ids)-1])]
+
+		}
+		if buf.Deadline.After(time.Now()) {
+			schema = buf.Schema
 		}
 	}
 
@@ -118,9 +131,12 @@ func (r *Registry) getSchema(topic string, id *uint32) (*srclient.Schema, error)
 	}
 
 	if r.schemas[topic] == nil {
-		r.schemas[topic] = map[uint32]*srclient.Schema{}
+		r.schemas[topic] = map[uint32]*schemaBuf{}
 	}
-	r.schemas[topic][*id] = schema
+	r.schemas[topic][*id] = &schemaBuf{
+		schema,
+		time.Now(),
+	}
 
 	return schema, nil
 }

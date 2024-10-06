@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"kafka-sidecar/internal/adapters/httpServer"
 	"kafka-sidecar/internal/adapters/kafka"
 	"kafka-sidecar/internal/adapters/registry"
 	"kafka-sidecar/internal/adapters/remoteServer"
@@ -9,8 +10,9 @@ import (
 	"kafka-sidecar/internal/service"
 	"time"
 
-	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+
+	"github.com/rs/zerolog"
 )
 
 func main() {
@@ -18,6 +20,7 @@ func main() {
 		log.Info().Msgf("Startup delay %d seconds", config.Config.StartupDelay)
 		time.Sleep(time.Duration(config.Config.StartupDelay) * time.Second)
 	}
+
 	ctx, doneFunc := context.WithCancel(context.Background())
 	defer doneFunc()
 
@@ -34,11 +37,19 @@ func main() {
 	}()
 
 	srv := &service.Service{
-		Kafka:            kafkaInst,
-		SchemaRegistry:   registry.New(config.Config.SchemaRegistryUrl),
+		KafkaSender:      kafkaInst,
+		SchemaRegistry:   registry.New(config.Config.SchemaRegistryUrl, config.Config.AvroSchemaRefreshInterval),
 		RemoteServer:     remoteServer.New(config.Config.HttpRoute),
 		CommitOnSuccess:  config.Config.CommitOnSuccess,
 		TerminateOnError: config.Config.TerminateOnError,
+	}
+
+	if len(config.Config.KafkaTopics) > 0 {
+		srv.KafkaListener = kafkaInst
+	}
+
+	if config.Config.HttpPort > 0 {
+		srv.HttpServer = httpServer.New(config.Config.HttpPort)
 	}
 
 	srv.Run(ctx)

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/rs/zerolog/log"
@@ -21,14 +22,23 @@ type RemoteServer interface {
 	Send(ctx context.Context, topic string, headers map[string]string, key, value []byte, timestamp time.Time, offset int64) ([]byte, error)
 }
 
-type Kafka interface {
+type HttpServer interface {
+	Listen(ctx context.Context) (<-chan []byte, <-chan error)
+}
+
+type KafkaListener interface {
 	Listen(ctx context.Context) (<-chan kafka.Message, <-chan error)
 	CommitMessage(ctx context.Context, m kafka.Message) error
+}
+
+type KafkaSender interface {
 	Send(ctx context.Context, m kafka.Message) error
 }
 
 type Service struct {
-	Kafka            Kafka
+	KafkaListener    KafkaListener
+	KafkaSender      KafkaSender
+	HttpServer       HttpServer
 	SchemaRegistry   SchemaRegistry
 	RemoteServer     RemoteServer
 	CommitOnSuccess  bool
@@ -36,46 +46,84 @@ type Service struct {
 }
 
 func (s *Service) Run(ctx context.Context) {
-	messageCh, errorCh := s.Kafka.Listen(ctx)
+	wg := sync.WaitGroup{}
+	wg.Add(2)
 
 	go func() {
-		for err := range errorCh {
-			log.Error().Err(err).Msg("listen error")
-			if s.TerminateOnError {
+		defer wg.Done()
+		if s.KafkaListener == nil {
+			return
+		}
+
+		messageCh, errorCh := s.KafkaListener.Listen(ctx)
+
+		go func() {
+			for err := range errorCh {
+				log.Error().Err(err).Msg("kafka listen error")
+				if s.TerminateOnError {
+					os.Exit(1)
+				}
+			}
+		}()
+
+		for m := range messageCh {
+			log.Debug().
+				Str("topic", m.Topic).
+				Str("key", string(m.Key)).
+				Time("timestamp", m.Time).
+				Int64("offset", m.Offset).
+				Msg("new message")
+
+			needExit := false
+			err := s.kafkaProcessing(ctx, m)
+			if err != nil {
+				log.Error().Err(err).Msg("kafka processing error")
+				needExit = s.TerminateOnError
+			}
+			if err == nil && s.CommitOnSuccess {
+				log.Debug().Msgf("Committing message with offset: %d", m.Offset)
+				if err = s.KafkaListener.CommitMessage(ctx, m); err != nil {
+					log.Error().Err(err).Msg("commit error")
+					needExit = needExit || s.TerminateOnError
+				}
+			}
+
+			if needExit {
 				os.Exit(1)
 			}
 		}
 	}()
 
-	for m := range messageCh {
-		log.Debug().
-			Str("topic", m.Topic).
-			Str("key", string(m.Key)).
-			Time("timestamp", m.Time).
-			Int64("offset", m.Offset).
-			Msg("new message")
-
-		needExit := false
-		err := s.processing(ctx, m)
-		if err != nil {
-			log.Error().Err(err).Msg("processing error")
-			needExit = s.TerminateOnError
+	go func() {
+		defer wg.Done()
+		if s.HttpServer == nil {
+			return
 		}
-		if err == nil && s.CommitOnSuccess {
-			log.Debug().Msgf("Committing message with offset: %d", m.Offset)
-			if err = s.Kafka.CommitMessage(ctx, m); err != nil {
-				log.Error().Err(err).Msg("commit error")
-				needExit = needExit || s.TerminateOnError
+
+		messageCh, errorCh := s.HttpServer.Listen(ctx)
+
+		go func() {
+			for err := range errorCh {
+				log.Error().Err(err).Msg("kafka listen error")
+				if s.TerminateOnError {
+					os.Exit(1)
+				}
+			}
+		}()
+
+		for m := range messageCh {
+			err := s.httpServerProcessing(ctx, m)
+			if err != nil {
+				log.Error().Err(err).Msg("http server processing error")
+				os.Exit(1)
 			}
 		}
+	}()
 
-		if needExit {
-			os.Exit(1)
-		}
-	}
+	wg.Wait()
 }
 
-func (s *Service) processing(ctx context.Context, msg kafka.Message) error {
+func (s *Service) kafkaProcessing(ctx context.Context, msg kafka.Message) error {
 	value, err := s.SchemaRegistry.Decode(msg.Topic, msg.Value)
 	if err != nil {
 		return fmt.Errorf(
@@ -110,12 +158,7 @@ func (s *Service) processing(ctx context.Context, msg kafka.Message) error {
 		)
 	}
 
-	var res []struct {
-		Topic   string            `json:"topic"`
-		Headers map[string]string `json:"headers"`
-		Key     string            `json:"key"`
-		Value   json.RawMessage   `json:"value"`
-	}
+	var res []sendMessage
 
 	if err := json.Unmarshal(data, &res); err != nil {
 		return fmt.Errorf(
@@ -125,34 +168,19 @@ func (s *Service) processing(ctx context.Context, msg kafka.Message) error {
 		)
 	}
 
-	for _, re := range res {
-		var m kafka.Message
-		m.Topic = re.Topic
-		m.Key = []byte(re.Key)
-		for s2, s3 := range re.Headers {
-			m.Headers = append(m.Headers, kafka.Header{Key: s2, Value: []byte(s3)})
-		}
-		m.Value, err = s.SchemaRegistry.Encode(re.Topic, re.Value)
-		if err != nil {
-			return fmt.Errorf(
-				"pack message error for topic %s: value: %v, error: %w",
-				re.Topic,
-				string(re.Value),
-				err,
-			)
-		}
+	return s.send(ctx, res)
+}
 
-		log.Debug().
-			Str("topic", m.Topic).
-			Str("key", string(m.Key)).
-			Time("timestamp", m.Time).
-			Int64("offset", m.Offset).
-			Msg("send message")
+func (s *Service) httpServerProcessing(ctx context.Context, msg []byte) error {
+	var res []sendMessage
 
-		if err := s.Kafka.Send(ctx, m); err != nil {
-			return fmt.Errorf("send message error: %w", err)
-		}
+	if err := json.Unmarshal(msg, &res); err != nil {
+		return fmt.Errorf(
+			"unmarshal message error for data: %s, error: %w",
+			string(msg),
+			err,
+		)
 	}
 
-	return nil
+	return s.send(ctx, res)
 }

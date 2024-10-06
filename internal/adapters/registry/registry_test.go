@@ -32,7 +32,7 @@ func TestRegistry(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	tr := registry.New(ts.URL)
+	tr := registry.New(ts.URL, 10)
 
 	for i, msg := range testTable {
 		t.Run(fmt.Sprintf("test #%d", i), func(t *testing.T) {

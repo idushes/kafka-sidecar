@@ -10,19 +10,15 @@ import (
 )
 
 type Kafka struct {
-	brokers         []string
-	topics          []string
-	consumerGroupId string
-	consumers       map[string]*kafka.Reader
-	producer        *kafka.Writer
+	brokers   []string
+	consumers map[string]*kafka.Reader
+	producer  *kafka.Writer
 }
 
 func New(brokers, topics []string, consumerGroupId string) *Kafka {
 	k := &Kafka{
-		brokers:         brokers,
-		topics:          topics,
-		consumerGroupId: consumerGroupId,
-		consumers:       make(map[string]*kafka.Reader, len(topics)),
+		brokers:   brokers,
+		consumers: make(map[string]*kafka.Reader, len(topics)),
 		producer: kafka.NewWriter(kafka.WriterConfig{
 			Brokers: brokers,
 		}),
