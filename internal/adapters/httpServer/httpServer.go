@@ -36,8 +36,9 @@ func (hs *HttpServer) Listen(ctx context.Context) (<-chan []byte, <-chan error) 
 					"message": err.Error(),
 				})
 			}
+			err = c.NoContent(http.StatusCreated)
 			messageCh <- b
-			return c.NoContent(http.StatusCreated)
+			return err
 		})
 
 		if err := e.Start(fmt.Sprintf(":%d", hs.port)); err != nil {
