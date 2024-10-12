@@ -23,7 +23,7 @@ type RemoteServer interface {
 }
 
 type HttpServer interface {
-	Listen(ctx context.Context) (<-chan []byte, <-chan error)
+	Listen(ctx context.Context, responseCh <-chan error) (<-chan []byte, <-chan error)
 }
 
 type KafkaListener interface {
@@ -100,11 +100,14 @@ func (s *Service) Run(ctx context.Context) {
 			return
 		}
 
-		messageCh, errorCh := s.HttpServer.Listen(ctx)
+		respCh := make(chan error)
+		defer close(respCh)
+
+		messageCh, errorCh := s.HttpServer.Listen(ctx, respCh)
 
 		go func() {
 			for err := range errorCh {
-				log.Error().Err(err).Msg("kafka listen error")
+				log.Error().Err(err).Msg("http listen error")
 				if s.TerminateOnError {
 					os.Exit(1)
 				}
@@ -115,12 +118,7 @@ func (s *Service) Run(ctx context.Context) {
 			log.Debug().
 				Bytes("message", m).
 				Msg("new message from http")
-
-			err := s.httpServerProcessing(ctx, m)
-			if err != nil {
-				log.Error().Err(err).Msg("http server processing error")
-				os.Exit(1)
-			}
+			respCh <- s.httpServerProcessing(ctx, m)
 		}
 	}()
 

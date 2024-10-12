@@ -21,7 +21,7 @@ func New(port int) *HttpServer {
 	}
 }
 
-func (hs *HttpServer) Listen(ctx context.Context) (<-chan []byte, <-chan error) {
+func (hs *HttpServer) Listen(ctx context.Context, responseCh <-chan error) (<-chan []byte, <-chan error) {
 	errCh := make(chan error)
 	messageCh := make(chan []byte)
 
@@ -36,9 +36,17 @@ func (hs *HttpServer) Listen(ctx context.Context) (<-chan []byte, <-chan error) 
 					"message": err.Error(),
 				})
 			}
-			err = c.NoContent(http.StatusCreated)
+
 			messageCh <- b
-			return err
+			if err := <-responseCh; err != nil {
+				return c.JSON(http.StatusInternalServerError, map[string]string{
+					"message": err.Error(),
+				})
+			}
+
+			return c.JSON(http.StatusOK, map[string]string{
+				"message": "ok",
+			})
 		})
 
 		if err := e.Start(fmt.Sprintf(":%d", hs.port)); err != nil {
